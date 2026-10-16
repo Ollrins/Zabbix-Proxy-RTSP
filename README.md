@@ -10,10 +10,10 @@
 - Резервный анализ через **FFprobe** (TCP-транспорт)
 - Метрики: FPS, яркость, движение, размер кадра, разрешение, задержка
 - **Числовой статус** (0/1/2) для триггеров и SLA-отчётов
-- **Внутренние таймауты OpenCV** (`CAP_PROP_OPEN_TIMEOUT_MSEC` / `CAP_PROP_READ_TIMEOUT_MSEC`) и **SIGALRM**
+- **Внутренние таймауты OpenCV** (`CAP_PROP_OPEN_TIMEOUT_MSEC` / `CAP_PROP_READ_TIMEOUT_MSEC`) и мягкий таймаут цикла захвата (`deadline`)
 - **Маскировка пароля** в логах и JSON
 - **Подавление шума** ffmpeg/GStreamer — в stdout идёт только чистый JSON
-- **`null` отсутствует** — все числовые поля всегда `0` или значение
+- **`null` отсутствует** — все числовые поля всегда `0` или фактическое значение
 - Логи с автоперезаписью при превышении 15 МБ
 - Готовый шаблон Zabbix **`RTSP_Camera_Check`** с элементами, триггерами и графиками
 
@@ -25,7 +25,6 @@
 
 ```bash
 docker pull ollrins/zabbix-proxy-rtsp:latest
-```
 
 ### 📝 2. Пример простого `compose.yml`
 
@@ -72,6 +71,26 @@ networks:
     name: zabbix-net
 ```
 
+### 🎯 Что заменить
+
+| Плейсхолдер | Что подставить | Пример |
+|---|---|---|
+| `<PROXY_NAME>` | Имя прокси (совпадает с Zabbix UI) | `sauron-proxy` |
+| `<ZABBIX_SERVER_IP>` | IP-адрес Zabbix Server | `172.21.242.101` |
+
+### 🛠️ Запуск
+
+```bash
+# Создать сеть (если её нет)
+docker network create zabbix-net
+
+# Запустить
+docker compose up -d
+
+# Проверить логи
+docker logs -f zabbix-proxy
+```
+
 ---
 
 ## 🔗 Интеграция в Zabbix
@@ -96,9 +115,9 @@ networks:
 
 ---
 
-# 📊 Мониторинг RTSP в Zabbix — Макросы, Метрики и Триггеры
+## 📊 Мониторинг RTSP в Zabbix — Макросы, Метрики и Триггеры
 
-## 🧩 Макросы
+### 🧩 Макросы
 
 | Макрос              | Описание                 | По умолчанию |
 |---------------------|--------------------------|--------------|
@@ -108,24 +127,23 @@ networks:
 | `{$CAMERA_PATH}`    | Путь RTSP-потока         | `live/main`  |
 | `{HOST.CONN}`       | IP-адрес или DNS хоста   | (из интерфейса) |
 
-## 📡 Метрики
+### 📡 Метрики
 
 | Название                 | Ключ                       | Тип       | Описание                                       |
 |--------------------------|----------------------------|-----------|------------------------------------------------|
 | RTSP JSON Raw            | `check_rtsp.py[...]`       | EXTERNAL  | Базовый JSON-ответ (мастер-элемент)             |
 | RTSP Status Code         | `rtsp.status_code`         | DEPENDENT | Числовой статус: `1`=ok, `2`=no_frames, `0`=error |
+| RTSP Status              | `rtsp.status`              | DEPENDENT | Текстовый статус: `ok`, `no_frames`, `error`    |
 | RTSP Latency             | `rtsp.latency`             | DEPENDENT | Задержка открытия потока (мс)                   |
 | RTSP FPS                 | `rtsp.real_fps`            | DEPENDENT | Кадров в секунду                                |
 | RTSP Brightness          | `rtsp.avg_brightness`      | DEPENDENT | Средняя яркость                                 |
 | RTSP Motion Level        | `rtsp.frame_change_level`  | DEPENDENT | Средняя разница между кадрами                   |
 | RTSP Frame Count         | `rtsp.frames_read`         | DEPENDENT | Сколько кадров получено                         |
 | RTSP Frame Size (KB)     | `rtsp.avg_frame_size_kb`   | DEPENDENT | Средний объём кадра                             |
-| RTSP Width               | `rtsp.width`               | DEPENDENT | Ширина кадра (px)                               |
-| RTSP Height              | `rtsp.height`              | DEPENDENT | Высота кадра (px)                               |
-| RTSP Resolution (pixels) | `rtsp.resolution_pixels`   | DEPENDENT | Разрешение в пикселях                           |
+| RTSP Resolution          | `rtsp.resolution`          | DEPENDENT | Разрешение кадра (например, `1920x1080` через REGEX) |
 | RTSP Note                | `rtsp.note`                | DEPENDENT | Диагностика: причина сбоя от скрипта            |
 
-### 🎨 Value Mapping
+### 🎨 Value Mapping (для `rtsp.status_code`)
 
 | Значение | Отображение |
 |---|---|
@@ -141,24 +159,23 @@ networks:
 |---|---|
 | Всё работает | *(пусто)* |
 | OpenCV не открыл поток | `OpenCV failed to open stream` |
-| OpenCV таймаут | `OpenCV open timed out after 5s` |
-| Захват залип | `OpenCV capture timed out after 8s` |
-| Подключился, но нет кадров | `Connected, but no valid frames` |
-| GStreamer таймаут | `GStreamer open timed out after 5s` |
-| ffprobe вытащил метаданные | `... \| Metadata via ffprobe` |
+| Захват не дал валидных кадров | `Connected, but no valid frames` |
+| Успешный фоллбэк на ffprobe | `... \| Metadata via ffprobe` |
 
-## 🚨 Триггеры
+### 🚨 Триггеры
 
-| Название                              | Условие                                                              | Приоритет |
-|---------------------------------------|----------------------------------------------------------------------|-----------|
-| Чёрный экран                          | `last(avg_brightness) < 5`                                           | Warning   |
-| Изображение замёрзло                  | `count(frame_change_level,5m,"lt",1) = 5`                            | Warning   |
-| Низкий FPS                            | `count(real_fps,5m,"lt",5) = 5`                                      | Average   |
-| Камера недоступна                     | `last(status_code) = 0`                                              | Average   |
-| Камера не выдаёт кадры                | `last(status_code) = 2`                                              | Average   |
-| **Проблема с RTSP-потоком**           | `last(status_code) <> 1` **или** `nodata(status_code,360) = 1`       | **Disaster** |
+| Название                              | Условие                                                              | Приоритет | Статус       |
+|---------------------------------------|----------------------------------------------------------------------|-----------|--------------|
+| Чёрный экран                          | `last(avg_brightness) < 5`                                           | Warning   | Включён      |
+| Изображение замёрзло                  | `last(frame_change_level) < 1`                                       | Average   | Отключён *   |
+| Низкий FPS                            | `last(real_fps) < 5`                                                 | Average   | Отключён *   |
+| Камера недоступна                     | `last(status) = "error"`                                             | Warning   | Включён      |
+| Камера не выдаёт кадры                | `last(status) = "no_frames"`                                         | High      | Включён      |
+| **Проблема с RTSP-потоком**           | `last(status_code) <> 1` **или** `nodata(status_code,360) = 1`       | **High**  | **Включён**  |
 
-Триггер **«Проблема с RTSP-потоком»** закрывается только при выполнении **обоих** условий:
+> \* Триггеры **«Изображение замёрзло»** и **«Низкий FPS»** по умолчанию **отключены** (`DISABLED`), так как требуют индивидуальной калибровки порогов под конкретные условия освещения и сцены камеры. Включите их вручную при необходимости.
+
+Триггер **«Проблема с RTSP-потоком»** закрывается только при выполнении **обоих** условий восстановления:
 
 ```text
 last(/RTSP_Camera_Check/rtsp.status_code) = 1
@@ -166,27 +183,25 @@ and
 nodata(/RTSP_Camera_Check/rtsp.status_code,360) = 0
 ```
 
-## ⏱️ Таймаут скрипта
+### ⏱️ Таймаут скрипта
 
 | Параметр | Значение | Где задаётся |
 |---|---|---|
 | Timeout элемента `RTSP JSON Raw` | **40s** | В шаблоне (`timeout: 40s`) |
 | Типовая длительность работы | 4–8 сек | — |
-| Худший случай | ~35 сек | срабатывают все три таймаута (OpenCV, GStreamer, ffprobe) |
+| Худший случай | ~35 сек | Срабатывают все три таймаута (OpenCV, GStreamer, ffprobe) |
 | Интервал опроса | 3 мин | `delay: 3m` в шаблоне |
 
-Внутри скрипта используются:
-- **`CAP_PROP_OPEN_TIMEOUT_MSEC`** / **`CAP_PROP_READ_TIMEOUT_MSEC`** — таймауты OpenCV (работают в OpenCV 4.x с FFmpeg-бэкендом);
-- **`signal.SIGALRM`** — жёсткий таймаут на открытие и захват;
-- **`deadline`** в `capture_rtsp` — мягкая остановка цикла захвата.
+**Внутри скрипта используются:**
 
-## 📈 Графики
+- **`CAP_PROP_OPEN_TIMEOUT_MSEC`** / **`CAP_PROP_READ_TIMEOUT_MSEC`** — встроенные таймауты OpenCV (работают в OpenCV 4.x с FFmpeg-бэкендом);
+- **`deadline`** в функции `capture_rtsp` — мягкая и безопасная остановка цикла захвата кадров, предотвращающая зависание.
+
+### 📈 Графики
 
 | Название                     | Содержимое                                          |
 |------------------------------|-----------------------------------------------------|
-| Качество видео               | Яркость, FPS, уровень движения                      |
-| Доступность камеры           | Status Code, Is Available, Latency                  |
-| Разрешение и размер кадра    | Resolution (pixels), Frame Size (KB)                |
+| Качество видео               | Яркость (`avg_brightness`), FPS (`real_fps`), уровень движения (`frame_change_level`) |
 
 ---
 
@@ -226,7 +241,7 @@ MIT License — свободное использование и модифик�
 
 ## 🙌 О проекте
 
-Сделано для мониторинга IP-камер.
+Сделано для надёжного мониторинга IP-камер в продакшене.
 
 Нашли баг или есть идея? Открывайте **Issue**.
 Понравилось — поставьте ⭐ репозиторию.
