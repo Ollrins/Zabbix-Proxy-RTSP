@@ -7,8 +7,6 @@ zabbix_export:
     - uuid: 3176d890af27425bbc37026058f6989b
       template: RTSP_Camera_Check
       name: RTSP_Camera_Check
-      templates:
-        - name: 'ICMP Ping'
       groups:
         - name: 'Security Cameras - AllCamers'
       items:
@@ -16,22 +14,19 @@ zabbix_export:
           name: 'RTSP JSON Raw'
           type: EXTERNAL
           key: 'check_rtsp.py[{$CAMERA_LOGIN},{$CAMERA_PWD},{HOST.CONN},{$CAMERA_PORT},{$CAMERA_PATH}]'
-          delay: 60s
-          history: 1d
+          delay: 3m
+          history: 7d
           value_type: TEXT
           timeout: 40s
         - uuid: 531f0f7e20c74503a84ae029de4ba88f
           name: 'RTSP Brightness'
           type: DEPENDENT
           key: rtsp.avg_brightness
-          value_type: FLOAT
           trends: 93d
           preprocessing:
             - type: JSONPATH
               parameters:
                 - $.avg_brightness
-              error_handler: CUSTOM_VALUE
-              error_handler_params: '0'
           master_item:
             key: 'check_rtsp.py[{$CAMERA_LOGIN},{$CAMERA_PWD},{HOST.CONN},{$CAMERA_PORT},{$CAMERA_PATH}]'
           triggers:
@@ -39,20 +34,17 @@ zabbix_export:
               expression: last(/RTSP_Camera_Check/rtsp.avg_brightness)<5
               name: 'Чёрный экран (яркость < 5)'
               priority: WARNING
+              manual_close: 'YES'
         - uuid: 9b71a2209e944fc5a9990bde0b0ed5c1
           name: 'RTSP Frame Size (KB)'
           type: DEPENDENT
           key: rtsp.avg_frame_size_kb
           history: 93d
-          value_type: FLOAT
           trends: 93d
-          units: KB
           preprocessing:
             - type: JSONPATH
               parameters:
                 - $.avg_frame_size_kb
-              error_handler: CUSTOM_VALUE
-              error_handler_params: '0'
           master_item:
             key: 'check_rtsp.py[{$CAMERA_LOGIN},{$CAMERA_PWD},{HOST.CONN},{$CAMERA_PORT},{$CAMERA_PATH}]'
         - uuid: c31b239ea6484c5cbe50e8136f27a7c3
@@ -64,8 +56,6 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - $.frames_read
-              error_handler: CUSTOM_VALUE
-              error_handler_params: '0'
           master_item:
             key: 'check_rtsp.py[{$CAMERA_LOGIN},{$CAMERA_PWD},{HOST.CONN},{$CAMERA_PORT},{$CAMERA_PATH}]'
         - uuid: 4eef0798c3aa4f398df61502e57bad05
@@ -73,48 +63,21 @@ zabbix_export:
           type: DEPENDENT
           key: rtsp.frame_change_level
           history: 93d
-          value_type: FLOAT
           trends: 93d
           preprocessing:
             - type: JSONPATH
               parameters:
                 - $.frame_change_level
-              error_handler: CUSTOM_VALUE
-              error_handler_params: '0'
           master_item:
             key: 'check_rtsp.py[{$CAMERA_LOGIN},{$CAMERA_PWD},{HOST.CONN},{$CAMERA_PORT},{$CAMERA_PATH}]'
           triggers:
             - uuid: 6126a5e785534ae8a7c8b6b4dea37451
-              expression: 'count(/RTSP_Camera_Check/rtsp.frame_change_level,5m,"lt",1)=5'
+              expression: last(/RTSP_Camera_Check/rtsp.frame_change_level)<1
               name: 'Изображение замёрзло (движение < 1%)'
-              priority: WARNING
-        - uuid: 6f7a8b9c0d1e4934a6f7a8b9c0d14934
-          name: 'RTSP Height'
-          type: DEPENDENT
-          key: rtsp.height
-          trends: 93d
-          units: px
-          preprocessing:
-            - type: JSONPATH
-              parameters:
-                - $.height
-              error_handler: CUSTOM_VALUE
-              error_handler_params: '0'
-          master_item:
-            key: 'check_rtsp.py[{$CAMERA_LOGIN},{$CAMERA_PWD},{HOST.CONN},{$CAMERA_PORT},{$CAMERA_PATH}]'
-        - uuid: 4d5e6f7a8b9c4912a4d5e6f7a8b94912
-          name: 'RTSP Is Available'
-          type: DEPENDENT
-          key: rtsp.is_available
-          trends: 93d
-          preprocessing:
-            - type: JSONPATH
-              parameters:
-                - $.is_available
-              error_handler: CUSTOM_VALUE
-              error_handler_params: '0'
-          master_item:
-            key: 'check_rtsp.py[{$CAMERA_LOGIN},{$CAMERA_PWD},{HOST.CONN},{$CAMERA_PORT},{$CAMERA_PATH}]'
+              status: DISABLED
+              priority: AVERAGE
+              type: MULTIPLE
+              manual_close: 'YES'
         - uuid: 8381fdf3d1be472da6ac2241c41e8b9d
           name: 'RTSP Latency'
           type: DEPENDENT
@@ -126,8 +89,6 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - $.latency_ms
-              error_handler: CUSTOM_VALUE
-              error_handler_params: '0'
           master_item:
             key: 'check_rtsp.py[{$CAMERA_LOGIN},{$CAMERA_PWD},{HOST.CONN},{$CAMERA_PORT},{$CAMERA_PATH}]'
         - uuid: 984e334bf75a43c6bb8f4b576c83a4fd
@@ -140,88 +101,97 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - $.note
-              error_handler: CUSTOM_VALUE
           master_item:
             key: 'check_rtsp.py[{$CAMERA_LOGIN},{$CAMERA_PWD},{HOST.CONN},{$CAMERA_PORT},{$CAMERA_PATH}]'
         - uuid: f43e3ae0e5d0460690e687e83c086226
           name: 'RTSP FPS'
           type: DEPENDENT
           key: rtsp.real_fps
-          value_type: FLOAT
           trends: 93d
           units: fps
           preprocessing:
             - type: JSONPATH
               parameters:
                 - $.real_fps
-              error_handler: CUSTOM_VALUE
-              error_handler_params: '0'
           master_item:
             key: 'check_rtsp.py[{$CAMERA_LOGIN},{$CAMERA_PWD},{HOST.CONN},{$CAMERA_PORT},{$CAMERA_PATH}]'
           triggers:
             - uuid: f04eddd50a8d4e74ad982f8caf14cf5e
-              expression: 'count(/RTSP_Camera_Check/rtsp.real_fps,5m,"lt",5)=5'
+              expression: last(/RTSP_Camera_Check/rtsp.real_fps)<5
               name: 'Низкий FPS (< 5 кадров/сек)'
+              status: DISABLED
               priority: AVERAGE
-        - uuid: 7a8b9c0d1e2f4945a7a8b9c0d1e24945
-          name: 'RTSP Resolution (pixels)'
+              type: MULTIPLE
+              manual_close: 'YES'
+        - uuid: 64d3cf42e50e49e9b1c06c963806a6bf
+          name: 'RTSP Resolution'
           type: DEPENDENT
-          key: rtsp.resolution_pixels
-          trends: 93d
-          units: px
+          key: rtsp.resolution
+          value_type: TEXT
+          preprocessing:
+            - type: REGEX
+              parameters:
+                - '"width"\s*:\s*(\d+).*?"height"\s*:\s*(\d+)'
+                - \1x\2
+          master_item:
+            key: 'check_rtsp.py[{$CAMERA_LOGIN},{$CAMERA_PWD},{HOST.CONN},{$CAMERA_PORT},{$CAMERA_PATH}]'
+        - uuid: 7868f15c83464221b294908b9534e42c
+          name: 'RTSP Status'
+          type: DEPENDENT
+          key: rtsp.status
+          value_type: TEXT
           preprocessing:
             - type: JSONPATH
               parameters:
-                - $.resolution_pixels
-              error_handler: CUSTOM_VALUE
-              error_handler_params: '0'
+                - $.status
           master_item:
             key: 'check_rtsp.py[{$CAMERA_LOGIN},{$CAMERA_PWD},{HOST.CONN},{$CAMERA_PORT},{$CAMERA_PATH}]'
-        - uuid: 1a2b3c4d5e6f4789a1b2c3d4e5f64789
+          triggers:
+            - uuid: e49d9a9b67d241a49e8a7ec36a6616a1
+              expression: 'last(/RTSP_Camera_Check/rtsp.status)="no_frames"'
+              name: 'Камера не выдаёт кадры'
+              priority: HIGH
+              type: MULTIPLE
+              manual_close: 'YES'
+            - uuid: c87d9e4039784f5c960684b833aaff1a
+              expression: 'last(/RTSP_Camera_Check/rtsp.status)="error"'
+              name: 'Камера недоступна'
+              priority: WARNING
+              manual_close: 'YES'
+        - uuid: 78dc77ffc04d4eb590e9204f219aa1b4
           name: 'RTSP Status Code'
           type: DEPENDENT
           key: rtsp.status_code
           trends: 93d
-          valuemap:
-            name: RTSPStatusCode
           preprocessing:
             - type: JSONPATH
               parameters:
-                - $.status_code
-              error_handler: CUSTOM_VALUE
-              error_handler_params: '0'
+                - $.status
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  if (value === 'ok') return 1;
+                  if (value === 'no_frames') return 2;
+                  return 0;
           master_item:
             key: 'check_rtsp.py[{$CAMERA_LOGIN},{$CAMERA_PWD},{HOST.CONN},{$CAMERA_PORT},{$CAMERA_PATH}]'
           triggers:
-            - uuid: 3c4d5e6f7a8b4901a3c4d5e6f7a84901
-              expression: last(/RTSP_Camera_Check/rtsp.status_code)=2
-              name: 'Камера не выдаёт кадры'
-              priority: AVERAGE
-            - uuid: 2b3c4d5e6f7a4890a2b3c4d5e6f74890
-              expression: last(/RTSP_Camera_Check/rtsp.status_code)=0
-              name: 'Камера недоступна'
-              priority: AVERAGE
-            - uuid: e49d9a9b67d241a49e8a7ec36a6616a1
-              expression: 'last(/RTSP_Camera_Check/rtsp.status_code)<>1 or nodata(/RTSP_Camera_Check/rtsp.status_code,5m)=1'
+            - uuid: 0616d06d46994b4fb072d37cd1b07f79
+              expression: |
+                last(/RTSP_Camera_Check/rtsp.status_code)<>1
+                or
+                nodata(/RTSP_Camera_Check/rtsp.status_code,360)=1
               recovery_mode: RECOVERY_EXPRESSION
-              recovery_expression: 'last(/RTSP_Camera_Check/rtsp.status_code)=1 and nodata(/RTSP_Camera_Check/rtsp.status_code,5m)=0'
+              recovery_expression: |
+                last(/RTSP_Camera_Check/rtsp.status_code)=1
+                and
+                nodata(/RTSP_Camera_Check/rtsp.status_code,360)=0
               name: 'Проблема с RTSP-потоком'
-              priority: DISASTER
-        - uuid: 5e6f7a8b9c0d4923a5e6f7a8b9c04923
-          name: 'RTSP Width'
-          type: DEPENDENT
-          key: rtsp.width
-          trends: 93d
-          units: px
-          preprocessing:
-            - type: JSONPATH
-              parameters:
-                - $.width
-              error_handler: CUSTOM_VALUE
-              error_handler_params: '0'
-          master_item:
-            key: 'check_rtsp.py[{$CAMERA_LOGIN},{$CAMERA_PWD},{HOST.CONN},{$CAMERA_PORT},{$CAMERA_PATH}]'
+              priority: HIGH
+              manual_close: 'YES'
       macros:
+        - macro: '{$CAMERA_IP}'
+          value: '{HOST.CONN}'
         - macro: '{$CAMERA_LOGIN}'
           value: admin
           description: Логин
@@ -234,37 +204,7 @@ zabbix_export:
         - macro: '{$CAMERA_PWD}'
           value: admin
           description: Пароль
-      valuemaps:
-        - uuid: 8b9c0d1e2f3a4956a8b9c0d1e2f34956
-          name: RTSPStatusCode
-          mappings:
-            - value: '1'
-              newvalue: Работает
-            - value: '2'
-              newvalue: 'Нет кадров'
-            - value: '0'
-              newvalue: Недоступна
   graphs:
-    - uuid: 9c0d1e2f3a4b4967a9c0d1e2f3a44967
-      name: 'Доступность камеры'
-      graph_items:
-        - color: 199C0D
-          calc_fnc: ALL
-          item:
-            host: RTSP_Camera_Check
-            key: rtsp.status_code
-        - sortorder: '1'
-          color: F63100
-          calc_fnc: ALL
-          item:
-            host: RTSP_Camera_Check
-            key: rtsp.is_available
-        - sortorder: '2'
-          color: 2774A4
-          calc_fnc: ALL
-          item:
-            host: RTSP_Camera_Check
-            key: rtsp.latency
     - uuid: 71df647f0ec846919a311a16562091bb
       name: 'Качество видео'
       graph_items:
@@ -285,17 +225,3 @@ zabbix_export:
           item:
             host: RTSP_Camera_Check
             key: rtsp.frame_change_level
-    - uuid: 0d1e2f3a4b5c4978a0d1e2f3a4b54978
-      name: 'Разрешение и размер кадра'
-      graph_items:
-        - color: 199C0D
-          calc_fnc: ALL
-          item:
-            host: RTSP_Camera_Check
-            key: rtsp.resolution_pixels
-        - sortorder: '1'
-          color: F63100
-          calc_fnc: ALL
-          item:
-            host: RTSP_Camera_Check
-            key: rtsp.avg_frame_size_kb
