@@ -1,6 +1,6 @@
 # 🎥 Zabbix Proxy с мониторингом RTSP-потоков
 
-Готовый Docker-образ **Zabbix Proxy** со встроенным скриптом проверки RTSP-видеопотоков. Подходит для мониторинга IP-камер через Zabbix.
+Готовый Docker-образ **Zabbix Proxy** со встроенной проверкой RTSP-видеопотоков. Подходит для мониторинга IP-камер через Zabbix.
 
 ---
 
@@ -10,11 +10,11 @@
 - Резервный анализ через **FFprobe** (TCP-транспорт)
 - Метрики: FPS, яркость, движение, размер кадра, разрешение, задержка
 - **Числовой статус** (0/1/2) для триггеров и SLA-отчётов
-- **Внутренние таймауты OpenCV** (`CAP_PROP_OPEN_TIMEOUT_MSEC` / `CAP_PROP_READ_TIMEOUT_MSEC`) и мягкий таймаут цикла захвата (`deadline`)
+- **Внутренние таймауты** — скрипт не виснет на неработающих потоках
 - **Маскировка пароля** в логах и JSON
-- **Подавление шума** ffmpeg/GStreamer — в stdout идёт только чистый JSON
-- **`null` отсутствует** — все числовые поля всегда `0` или фактическое значение
-- Логи с автоперезаписью при превышении 15 МБ
+- **Подавление шума** ffmpeg/GStreamer — в Zabbix идёт только чистый JSON
+- **`null` отсутствует** — все числовые поля всегда число (`0` при отсутствии данных)
+- **Два лога** с автоочисткой при превышении 15 МБ
 - Готовый шаблон Zabbix **`RTSP_Camera_Check`** с элементами, триггерами и графиками
 
 ---
@@ -24,7 +24,8 @@
 ### 📦 1. Скачать образ
 
 ```bash
-docker pull ollrins/zabbix-proxy-rtsp:latest
+docker pull ollrins/zabbix-proxy-rtsp:masked
+```
 
 ### 📝 2. Пример простого `compose.yml`
 
@@ -45,7 +46,7 @@ services:
             MYSQL_ROOT_PASSWORD: zabbix
 
     zabbix-proxy:
-        image: ollrins/zabbix-proxy-rtsp:latest
+        image: ollrins/zabbix-proxy-rtsp:masked
         container_name: zabbix-proxy
         restart: unless-stopped
         depends_on:
@@ -101,7 +102,7 @@ docker logs -f zabbix-proxy
    check_rtsp.py[{$CAMERA_LOGIN},{$CAMERA_PWD},{HOST.CONN},{$CAMERA_PORT},{$CAMERA_PATH}]
    ```
 3. Тип значений: **Текст**
-4. **Timeout: 40s** — обязательно
+4. **Timeout: 40s**
 
 > `{HOST.CONN}` подставляется из интерфейса узла сети. Убедитесь, что IP доступен из прокси-контейнера.
 
@@ -192,10 +193,6 @@ nodata(/RTSP_Camera_Check/rtsp.status_code,360) = 0
 | Худший случай | ~35 сек | Срабатывают все три таймаута (OpenCV, GStreamer, ffprobe) |
 | Интервал опроса | 3 мин | `delay: 3m` в шаблоне |
 
-**Внутри скрипта используются:**
-
-- **`CAP_PROP_OPEN_TIMEOUT_MSEC`** / **`CAP_PROP_READ_TIMEOUT_MSEC`** — встроенные таймауты OpenCV (работают в OpenCV 4.x с FFmpeg-бэкендом);
-- **`deadline`** в функции `capture_rtsp` — мягкая и безопасная остановка цикла захвата кадров, предотвращающая зависание.
 
 ### 📈 Графики
 
@@ -209,18 +206,17 @@ nodata(/RTSP_Camera_Check/rtsp.status_code,360) = 0
 
 Внутри контейнера:
 
-| Файл | Назначение |
+| Файл | Назначение | Ротация |
 |---|---|
-| `/var/log/check_rtsp.log` | Основной лог: проверки, результаты, таймауты |
-| `/var/log/check_rtsp_ffmpeg.log` | Шум ffmpeg/OpenCV/GStreamer (отделён от stdout) |
+| `/var/log/check_rtsp.log` | Основной лог: проверки, результаты, таймауты | ✅ 15 МБ |
+| `/var/log/check_rtsp_wrapper.err` | Шум ffmpeg/GStreamer, traceback Python | ✅ 15 МБ |
 
-Ротация — при превышении **15 МБ**.
 
 Просмотр:
 
 ```bash
 docker exec -it zabbix-proxy tail -50 /var/log/check_rtsp.log
-docker exec -it zabbix-proxy tail -50 /var/log/check_rtsp_ffmpeg.log
+docker exec -it zabbix-proxy tail -50 /var/log/check_rtsp_wrapper.err
 ```
 
 ---
