@@ -204,10 +204,10 @@ nodata(/RTSP_Camera_Check/rtsp.status_code,360) = 0
 
 ## 🗂️ Лог-файлы
 
-Внутри контейнера:
+Внутри контейнера создаются два лога:
 
 | Файл | Назначение | Ротация |
-|---|---|
+|---|---|---|
 | `/var/log/check_rtsp.log` | Основной лог: проверки, результаты, таймауты | ✅ 15 МБ |
 | `/var/log/check_rtsp_wrapper.err` | Шум ffmpeg/GStreamer, traceback Python | ✅ 15 МБ |
 
