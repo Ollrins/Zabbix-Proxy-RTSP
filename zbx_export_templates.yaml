@@ -1,3 +1,4 @@
+Смирнова Ольга А. (21.10.2026 12:23):
 zabbix_export:
   version: '7.4'
   template_groups:
@@ -151,7 +152,6 @@ zabbix_export:
               expression: 'last(/RTSP_Camera_Check/rtsp.status)="no_frames"'
               name: 'Камера не выдаёт кадры'
               priority: HIGH
-              type: MULTIPLE
               manual_close: 'YES'
             - uuid: c87d9e4039784f5c960684b833aaff1a
               expression: 'last(/RTSP_Camera_Check/rtsp.status)="error"'
