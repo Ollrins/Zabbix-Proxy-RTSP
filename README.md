@@ -231,7 +231,13 @@ docker exec -it zabbix-proxy tail -50 /var/log/check_rtsp_wrapper.err
 
 ## 📄 Лицензия
 
-MIT License — свободное использование и модификация с сохранением авторства.
+Этот проект основан на [zabbix_rtsp](https://github.com/RoganovDA/zabbix_rtsp) от RoganovDA, распространяемом под MIT License.
+
+Оригинальный код: Copyright (c) 2025 RoganovDA
+
+Модификации и дополнения: Copyright (c) 2026 Ollrins Totem312
+
+Проект распространяется под MIT License. Полный текст лицензии — в файле [LICENSE](LICENSE).
 
 ---
 
