@@ -1,4 +1,3 @@
-Смирнова Ольга А. (21.10.2026 12:23):
 zabbix_export:
   version: '7.4'
   template_groups:
