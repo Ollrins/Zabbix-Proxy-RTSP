@@ -46,7 +46,7 @@ services:
             MYSQL_ROOT_PASSWORD: zabbix
 
     zabbix-proxy:
-        image: ollrins/zabbix-proxy-rtsp:masked
+        image: ollrins/zabbix-proxy-rtsp:2.0
         container_name: zabbix-proxy
         restart: unless-stopped
         depends_on:
