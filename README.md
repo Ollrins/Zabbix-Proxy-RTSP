@@ -24,7 +24,7 @@
 ### 📦 1. Скачать образ
 
 ```bash
-docker pull ollrins/zabbix-proxy-rtsp:masked
+docker pull ollrins/zabbix-proxy-rtsp:2.0
 ```
 
 ### 📝 2. Пример простого `compose.yml`
